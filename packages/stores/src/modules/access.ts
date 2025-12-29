@@ -73,8 +73,8 @@ export const useAccessStore = defineStore('core-access', {
       this.isLockScreen = true;
       this.lockScreenPassword = password;
     },
-    setAccessCodes(codes: string[]) {
-      this.accessCodes = codes;
+    setAccessCodes(codes: unknown) {
+      this.accessCodes = Array.isArray(codes) ? codes : [];
     },
     setAccessMenus(menus: MenuRecordRaw[]) {
       this.accessMenus = menus;

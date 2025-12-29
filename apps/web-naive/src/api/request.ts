@@ -34,6 +34,7 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
     const accessStore = useAccessStore();
     const authStore = useAuthStore();
     accessStore.setAccessToken(null);
+    accessStore.setRefreshToken(null);
     if (
       preferences.app.loginExpiredMode === 'modal' &&
       accessStore.isAccessChecked
@@ -49,9 +50,20 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
    */
   async function doRefreshToken() {
     const accessStore = useAccessStore();
-    const resp = await refreshTokenApi();
-    const newToken = resp.data;
+    if (!accessStore.refreshToken) {
+      await doReAuthenticate();
+      throw new Error('Refresh token missing');
+    }
+    const resp = await refreshTokenApi(accessStore.refreshToken);
+    const newToken = resp.token;
+    if (!newToken) {
+      await doReAuthenticate();
+      throw new Error('Refresh token failed');
+    }
     accessStore.setAccessToken(newToken);
+    if (resp.refreshToken) {
+      accessStore.setRefreshToken(resp.refreshToken);
+    }
     return newToken;
   }
 
@@ -109,4 +121,20 @@ export const requestClient = createRequestClient(apiURL, {
   responseReturn: 'data',
 });
 
-export const baseRequestClient = new RequestClient({ baseURL: apiURL });
+export const baseRequestClient = new RequestClient({
+  baseURL: apiURL,
+  responseReturn: 'data',
+});
+
+baseRequestClient.addResponseInterceptor(
+  defaultResponseInterceptor({
+    codeField: 'code',
+    dataField: 'data',
+    successCode: 0,
+  }),
+);
+baseRequestClient.addResponseInterceptor(
+  errorMessageResponseInterceptor((msg: string) => {
+    message.error(msg);
+  }),
+);

@@ -1,0 +1,76 @@
+<script lang="ts" setup>
+import { h, onMounted, reactive, watch } from 'vue';
+
+import { NCard, NDataTable, NEmpty, NResult, NTag } from 'naive-ui';
+
+import { usePaginatedEndpoint } from '../common/usePageData';
+
+interface UserUsageItem {
+  userId: string;
+  username?: string;
+  requests: number;
+  tokens: number;
+  cost?: number;
+  currency?: string;
+}
+
+const { loading, items, total, error, fetch } =
+  usePaginatedEndpoint<UserUsageItem>('/admin/ai/usage/user');
+
+const columns = [
+  { title: '用户', key: 'username' },
+  { title: '用户ID', key: 'userId' },
+  { title: '请求数', key: 'requests' },
+  { title: 'Tokens', key: 'tokens' },
+  {
+    title: '成本',
+    key: 'cost',
+    render: (row: UserUsageItem) =>
+      row.cost !== undefined
+        ? `${row.currency ?? ''} ${row.cost}`
+        : h(NTag, { size: 'small' }, { default: () => '未配置价格' }),
+  },
+];
+
+const pagination = reactive({
+  page: 1,
+  pageSize: 10,
+  itemCount: 0,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50, 100],
+  onChange: (page: number) => {
+    pagination.page = page;
+    fetch({ page, page_size: pagination.pageSize });
+  },
+  onUpdatePageSize: (size: number) => {
+    pagination.pageSize = size;
+    pagination.page = 1;
+    fetch({ page: 1, page_size: size });
+  },
+});
+
+watch(total, (val) => (pagination.itemCount = val));
+
+onMounted(() => fetch({ page: pagination.page, page_size: pagination.pageSize }));
+</script>
+
+<template>
+  <div class="p-4">
+    <NCard title="用户排行" :loading="loading">
+      <NResult
+        v-if="error"
+        status="error"
+        :title="error"
+        description="检查 /admin/ai/usage/user 接口"
+      />
+      <NEmpty v-else-if="!items.length && !loading" description="暂无数据" />
+      <NDataTable
+        v-else
+        :data="items"
+        :columns="columns"
+        :loading="loading"
+        :pagination="pagination"
+      />
+    </NCard>
+  </div>
+</template>
